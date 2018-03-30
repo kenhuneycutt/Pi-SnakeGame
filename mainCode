@@ -1,0 +1,89 @@
+
+#base code credit raspberrypi.org
+
+from sense_hat import SenseHat
+from time import sleep
+#basic imports
+
+
+#  s e t u p
+sense = SenseHat()
+direction = 'right'
+
+w =(255,255,255)
+bl = (0,0,0)
+r = (250, 0, 0)
+b = (0,0,255)
+g = (0,255,0)
+
+#Slug coordinates
+slugDots = [[2,4], [3,4], [4,4]]
+clearDots = [bl,bl,bl,bl,bl,bl,bl,bl, bl,bl,bl,bl,bl,bl,bl,bl,
+             bl,bl,bl,bl,bl,bl,bl,bl,
+             bl,bl,bl,bl,bl,bl,bl,bl,
+             bl,bl,bl,bl,bl,bl,bl,bl,
+             bl,bl,bl,bl,bl,bl,bl,bl,
+             bl,bl,bl,bl,bl,bl,bl,bl,
+             bl,bl,bl,bl,bl,bl,bl,bl]
+
+#drawing slug
+def draw_slug():
+    sense.set_pixels(clearDots)
+    for coord in slugDots:
+        sense.set_pixel(coord[0],coord[1], g)
+#move slug
+    #pops off oldest position, adds new position based on current direction, and checks for wrapping
+def move_slug():
+    FirstPos = slugDots[0]
+    LastPos = slugDots[-1]
+    newPos = getNewPos(LastPos)
+    check_wrap(newPos)
+    newBlank = FirstPos
+    slugDots.remove(FirstPos)
+    sense.set_pixel(newBlank[0], newBlank[1], b)
+    slugDots.append(newPos)
+
+    #checks for wrapping by seeing if less 0 or greater 7. plus minus value with 7
+def check_wrap(pos):
+    if pos[0]>7:
+        pos[0]-=7
+    if pos[0]<0:
+        pos[0]+=7
+    if pos[1]>7:
+        pos[1]-=7
+    if pos[1]<0:
+        pos[1]+=7
+    #gets new snake position by checking direction and adding appropriately
+def getNewPos(LastPos):
+    if direction == 'up':
+        LastPos[1]-=1
+    elif direction == 'down':
+        LastPos[1]+=1
+    elif direction == 'left':
+        LastPos[0]-=1
+    elif direction == 'right':
+        LastPos[0]+=1
+    return LastPos
+        
+
+#joystick listening
+def joystick_moved(event):
+    global direction
+    direction = event.direction
+    
+
+#MAIN CODE
+    #gets direction, draws slug, moves, sleeps, repeats
+sense.clear()
+n = 10 # n is testing timer
+sleep(.2)
+while n>0:
+    sense.stick.direction_any = joystick_moved
+    n-=1
+    draw_slug()
+    sleep(.8)
+    move_slug()
+    
+sleep(.25)
+sense.clear()
+
