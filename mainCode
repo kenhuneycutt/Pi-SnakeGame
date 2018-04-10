@@ -1,23 +1,57 @@
-
-#base code credit raspberrypi.org
-
+	#
+	#by Ken Huneycutt
+	#Python3, nano, March 2018
+	#base code credit raspberrypi.org
 from sense_hat import SenseHat
 from time import sleep
+from time import time
+from random import randrange
+import sys
 #basic imports
+
+#This game is based off the well-known snake game. Can play the game through using a Pi and SenseHat accessory
+#The mechanics is the player controls a set of dots that move like a snake. The snake is always moving in a direction, and the direction can be changed with the senseHat joystick. The snake wraps around the edges.
+#The game creates an apple regularly every partial second. This apple lengthens the snake 1 pixel when collided.
+#The player loses if the snake collideds with itself. The one exception is when the joystick is pushed in. This makes the snake stop moving completely, and the tail bits move to the head snake position. Useful for beginners.
+#When the player loses, the game prints the player's score, time, and congrats onto a connected display screen. The game restarts automatically after 10 seconds.
+
+
+#FEATS: 
+#Restarts game. 
+#Start message, 
+#initiate snake, 
+#directional input, 
+#1s movements, 
+#wrapping, 
+#end screen, 
+#position algorithm, 
+#apple spawn, 
+#lengthen snake, 
+#collide snake,
+#tell time, 
+#print game over screen
+
+
+
 
 
 #  s e t u p
+#SenseHat set to var, default direction set, color values set to vars
 sense = SenseHat()
 direction = 'right'
 
 w =(255,255,255)
 bl = (0,0,0)
-r = (250, 0, 0)
-b = (0,0,255)
+r = (120, 0, 0)
+b = (0,0,135)
 g = (0,255,0)
+y = (100,100,0)
+p = (100, 0,100)
 
-#Slug coordinates
-slugDots = [[2,4], [3,4], [4,4]]
+
+#Set Object Colors and  Coordinates
+#slugDots is starting Snake coordinates from tail to head. clearDots is a clear LED board. appleDot is an apple pixel default set to off the grid
+slugDots = [[1,1], [2,1], [3,1], [4,1] ] 
 clearDots = [bl,bl,bl,bl,bl,bl,bl,bl, bl,bl,bl,bl,bl,bl,bl,bl,
              bl,bl,bl,bl,bl,bl,bl,bl,
              bl,bl,bl,bl,bl,bl,bl,bl,
@@ -25,36 +59,57 @@ clearDots = [bl,bl,bl,bl,bl,bl,bl,bl, bl,bl,bl,bl,bl,bl,bl,bl,
              bl,bl,bl,bl,bl,bl,bl,bl,
              bl,bl,bl,bl,bl,bl,bl,bl,
              bl,bl,bl,bl,bl,bl,bl,bl]
+finishedDots = [r,r,r,r,r,r,r,r,  r,r,r,r,r,r,r,r,  b,b,b,b,b,b,b,b,  b,b,b,b,b,b,b,b,  r,r,r,r,r,r,r,r,  r,r,r,r,r,r,r,r,  b,b,b,b,b,b,b,b,  b,b,b,b,b,b,b,b]
+appleDot = [-1,-1]
 
-#drawing slug
-def draw_slug():
-    sense.set_pixels(clearDots)
-    for coord in slugDots:
-        sense.set_pixel(coord[0],coord[1], g)
-#move slug
-    #pops off oldest position, adds new position based on current direction, and checks for wrapping
-def move_slug():
+
+
+#drawing snake/slug
+#Takes in int input. int=1 when game is finished. int=2 draws the apple. or if int=0 draws the snake
+def draw_slug(int):
+    if (int == 1): #gameEndDraw
+        sense.set_pixels(finishedDots)
+    elif(int==2): #appledraw
+        sense.set_pixel(appleDot[0], appleDot[1], r)
+    else:	  #slugDraw
+        n = 0
+        for coord in slugDots:
+            n += 1
+            green = getGreen(n)
+            sense.set_pixel(coord[0],coord[1], green)
+
+#move snake/slug
+#pops off oldest position, adds new position based on current direction, and checks for wrapping
+#boolApple input is FALSE when snake collides with apple. IF true, snake removes the tail LED.
+def move_slug(boolApple):
     FirstPos = slugDots[0]
     LastPos = slugDots[-1]
-    newPos = getNewPos(LastPos)
+    tempPosx = LastPos[0]
+    tempPosy = LastPos[1]
+    newPos = getNewPos(tempPosx,tempPosy)
     check_wrap(newPos)
     newBlank = FirstPos
-    slugDots.remove(FirstPos)
-    sense.set_pixel(newBlank[0], newBlank[1], b)
+    if (boolApple==True):			#if collide apple, dont delete tail bit(it is added)
+        slugDots.remove(FirstPos)
+    sense.set_pixel(newBlank[0], newBlank[1], bl)
     slugDots.append(newPos)
 
-    #checks for wrapping by seeing if less 0 or greater 7. plus minus value with 7
+#checks snake wrapping 
+#checks for wrapping by seeing if each snake position pixel is less 0 or greater 7. Then moves accordingly to other side
 def check_wrap(pos):
     if pos[0]>7:
-        pos[0]-=7
+        pos[0]=0
     if pos[0]<0:
-        pos[0]+=7
+        pos[0]=7
     if pos[1]>7:
-        pos[1]-=7
+        pos[1]=0
     if pos[1]<0:
-        pos[1]+=7
-    #gets new snake position by checking direction and adding appropriately
-def getNewPos(LastPos):
+        pos[1]=7
+
+# gets new position for each snake pixel    
+#gets new snake position by checking direction and adding appropriately
+def getNewPos(posx, posy):
+    LastPos = [posx, posy]
     if direction == 'up':
         LastPos[1]-=1
     elif direction == 'down':
@@ -70,20 +125,158 @@ def getNewPos(LastPos):
 def joystick_moved(event):
     global direction
     direction = event.direction
-    
+
+#Starts game, shows welcome message
+def start():
+    sense.show_message("!!!", .1, b, r)
+    sense.clear()
+
+# creates apple on LED matrix
+#if apple no exist, creates random apple position, checks if colliding with snake, then draws apple
+def startApple():
+    global appleDot
+    if appleDot != [-1,-1]:
+        return
+    answer = False
+    while (answer == False):
+        posx = randrange(8)
+        posy = randrange(8)
+        appleDot = [posx,posy]
+        answer = checkApplePos()
+    draw_slug(2)
+
+#checks that apple is not same as snake position
+def checkApplePos():
+    global appleDot
+    nval = slugDots.count(appleDot)
+    if (nval>=1):
+        return False
+    else:
+        return True
+
+#checks if apple exists same position as snake positions, and resets position if so
+def testCollide():
+    global appleDot
+    nval = slugDots.count(appleDot)
+    if (nval>0):
+        appleDot = [-1,-1]
+        return True
+    return False
+
+#when collide apple, add snake bit to list. Mainly done in slugMove() using return boolean. Prints time onto a connected device too.
+def addSnake():
+    global slugDots
+    roundTime()
+    return False
+
+#checks snake collision with itself
+#if snake head position same as other snake list indices then collide is true (unless same position as 2nd head(which is done when in resting position))
+def checkSnakeCollide():
+    global slugDots
+    headIndex = len(slugDots)-1
+    for index in range(headIndex):
+        if (slugDots[headIndex]==slugDots[index]):
+            if (slugDots[headIndex]!=slugDots[headIndex-1]):
+                snakeCollide()
+                return
+
+#start game over screen. Show time, Show score, show pixel decoration, say gg. Waits 10 seconds, then restarts game.
+def snakeCollide():
+    global slugDots
+    roundTime()
+    print ("Game Over. ****SCORE: "+str(len(slugDots))+"   GG PLAYER ONE")
+    n = 10
+    while(n>0):
+        if (n%2==0):
+            boolA = True
+        else:
+            boolA = False
+        drawDec(boolA)
+        sleep(1)
+        n-=1
+    sense.clear()
+    reset()
+    #sys.exit(0)
+
+#print time rounded to integer
+def roundTime():
+    global startTimeVar
+    timeDifference = time()-startTimeVar
+    timeDifference = round(timeDifference)
+    print("Time so far: "+str(timeDifference)+"s")
+
+
+
+#Gets varying green brightness pixels, so snake pixels are gradient of green
+def getGreen(index):
+    g = min(255, index*10+40)
+    return (0,g,0)
+
+#Draws pixels when game over
+#draw pixels on border, alternating colors, flashing for 10 seconds
+def drawDec(boolA):
+    if (boolA == True):			#for alternation
+        #print("1")
+        for i in range(2):		#draw both edges
+            for j in range(4):		#draw every other dot this color
+                sense.set_pixel(i*7,2*j,y)
+                sense.set_pixel(i*7,2*j+1,p)
+        for i in range(4):
+            for j in range(2):
+                sense.set_pixel(i*2,7*j,y)
+                sense.set_pixel(i*2+1,7*j,p)
+    else:
+        #print("2")
+        for i in range(2):
+            for j in range(4):
+                sense.set_pixel(i*7,2*j,p)
+                sense.set_pixel(i*7,2*j+1,y)
+        for i in range(4):
+            for j in range(2):
+                sense.set_pixel(i*2,7*j,p)
+                sense.set_pixel(i*2+1,7*j,y)
+
+#resets game: clear board, reset variables
+def reset():
+    global slugDots
+    global appleDot
+    global startVarTime
+    global direction
+    global boolCollide
+    global n
+    sense.clear()
+    start()
+    n = 0
+    #print("RESET")
+    #roundTime()
+    slugDots = [[1,1], [2,1], [3,1], [4,1] ]
+    appleDot = [-1,-1]
+    boolCollide = True
+    direction = "right"
 
 #MAIN CODE
-    #gets direction, draws slug, moves, sleeps, repeats
+#gets direction, draws slug, moves, sleeps, repeats
 sense.clear()
-n = 10 # n is testing timer
+start()
+boolCollide = True
+n = 0 
 sleep(.2)
-while n>0:
-    sense.stick.direction_any = joystick_moved
-    n-=1
-    draw_slug()
-    sleep(.8)
-    move_slug()
-    
-sleep(.25)
 sense.clear()
-
+while (True):
+    if (n == 0):
+        startTimeVar = time()
+    sense.stick.direction_any = joystick_moved
+    n+=1
+    draw_slug(0)
+    sleep(.2)
+    move_slug(boolCollide)
+    boolCollide = True
+    if (n%9==0):
+         startApple() 
+    if (testCollide()==True):
+        boolCollide = addSnake()
+    checkSnakeCollide()
+draw_slug(1)
+sleep(.5)
+sense.clear()
+ #END
